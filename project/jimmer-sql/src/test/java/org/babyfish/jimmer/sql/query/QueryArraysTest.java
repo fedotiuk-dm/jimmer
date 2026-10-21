@@ -4,14 +4,20 @@ import org.babyfish.jimmer.sql.common.AbstractQueryTest;
 import org.babyfish.jimmer.sql.common.Constants;
 import org.babyfish.jimmer.sql.common.NativeDatabases;
 import org.babyfish.jimmer.sql.dialect.PostgresDialect;
+import org.babyfish.jimmer.sql.model.Gender;
 import org.babyfish.jimmer.sql.model.arrays.ArrayModel;
 import org.babyfish.jimmer.sql.model.arrays.ArrayModelTable;
+import org.babyfish.jimmer.sql.model.arrays.EnumArrayModel;
+import org.babyfish.jimmer.sql.model.arrays.EnumArrayModelTable;
+import org.babyfish.jimmer.sql.model.arrays.Priority;
 import org.babyfish.jimmer.sql.model.pg.PgArrayModel;
 import org.babyfish.jimmer.sql.model.pg.PgArrayModelTable;
+import org.babyfish.jimmer.sql.model.pg.PgEnumArrayModelTable;
 import org.h2.value.ValueJson;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 public class QueryArraysTest extends AbstractQueryTest {
@@ -162,6 +168,98 @@ public class QueryArraysTest extends AbstractQueryTest {
                                     "--->\"textList\":[\"d\",\"e\",\"f\"]," +
                                     "--->\"varcharArr\":[\"g\",\"h\",\"i\"]," +
                                     "--->\"varcharList\":[\"j\",\"k\",\"l\"]" +
+                                    "}]"
+                    );
+                }
+        );
+    }
+
+    @Test
+    public void testQueryEnumArrayProperties() {
+        connectAndExpect(
+                con -> {
+                    return getSqlClient()
+                            .getEntities()
+                            .forConnection(con)
+                            .findById(EnumArrayModel.class, 1L);
+                },
+                ctx -> {
+                    ctx.sql(
+                            "select tb_1_.ID, tb_1_.GENDERS, tb_1_.GENDER_LIST, tb_1_.PRIORITIES " +
+                                    "from ENUM_ARRAY_MODEL tb_1_ " +
+                                    "where tb_1_.ID = ?"
+                    );
+                    ctx.rows(
+                            "[{" +
+                                    "--->\"id\":1," +
+                                    "--->\"genders\":[\"MALE\",\"FEMALE\"]," +
+                                    "--->\"genderList\":[\"FEMALE\"]," +
+                                    "--->\"priorities\":[\"HIGH\",\"LOW\"]" +
+                                    "}]"
+                    );
+                }
+        );
+    }
+
+    @Test
+    public void testQueryEnumArrayPropertiesWithConditions() {
+        EnumArrayModelTable table = EnumArrayModelTable.$;
+        executeAndExpect(
+                getSqlClient()
+                        .createQuery(table)
+                        .where(table.genders().eq(new Gender[] {Gender.MALE, Gender.FEMALE}))
+                        .where(table.genderList().eq(Collections.singletonList(Gender.FEMALE)))
+                        .where(table.priorities().eq(Arrays.asList(Priority.HIGH, Priority.LOW)))
+                        .select(table),
+                ctx -> {
+                    ctx.sql(
+                            "select tb_1_.ID, tb_1_.GENDERS, tb_1_.GENDER_LIST, tb_1_.PRIORITIES " +
+                                    "from ENUM_ARRAY_MODEL tb_1_ " +
+                                    "where tb_1_.GENDERS = ? and tb_1_.GENDER_LIST = ? and tb_1_.PRIORITIES = ?"
+                    ).variables(
+                            new String[] {"M", "F"},
+                            new String[] {"F"},
+                            new Integer[] {2, 0}
+                    );
+                    ctx.rows(
+                            "[{" +
+                                    "--->\"id\":1," +
+                                    "--->\"genders\":[\"MALE\",\"FEMALE\"]," +
+                                    "--->\"genderList\":[\"FEMALE\"]," +
+                                    "--->\"priorities\":[\"HIGH\",\"LOW\"]" +
+                                    "}]"
+                    );
+                }
+        );
+    }
+
+    @Test
+    public void testQueryEnumArrayPropertiesWithConditionsByPostgres() {
+        NativeDatabases.assumeNativeDatabase();
+        PgEnumArrayModelTable table = PgEnumArrayModelTable.$;
+        executeAndExpect(
+                NativeDatabases.POSTGRES_DATA_SOURCE,
+                getSqlClient(it -> it.setDialect(new PostgresDialect()))
+                        .createQuery(table)
+                        .where(table.genderArr().eq(new Gender[] {Gender.MALE, Gender.FEMALE}))
+                        .where(table.textList().eq(Collections.singletonList(Gender.FEMALE)))
+                        .where(table.varcharList().eq(Collections.singletonList(Gender.MALE)))
+                        .where(table.priorities().eq(Arrays.asList(Priority.HIGH, Priority.LOW)))
+                        .select(table),
+                ctx -> {
+                    ctx.sql(
+                            "select tb_1_.ID, tb_1_.GENDER_ARR, tb_1_.TEXT_LIST, tb_1_.VARCHAR_LIST, tb_1_.PRIORITIES " +
+                                    "from PG_ENUM_ARRAY_MODEL tb_1_ " +
+                                    "where tb_1_.GENDER_ARR = ? and tb_1_.TEXT_LIST = ? " +
+                                    "and tb_1_.VARCHAR_LIST = ? and tb_1_.PRIORITIES = ?"
+                    );
+                    ctx.rows(
+                            "[{" +
+                                    "--->\"id\":1," +
+                                    "--->\"genderArr\":[\"MALE\",\"FEMALE\"]," +
+                                    "--->\"textList\":[\"FEMALE\"]," +
+                                    "--->\"varcharList\":[\"MALE\"]," +
+                                    "--->\"priorities\":[\"HIGH\",\"LOW\"]" +
                                     "}]"
                     );
                 }
